@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task & Performance Evaluation Hub - นายธวัชชัย ชุมพลสุข</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669', 700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-600 p-2.5 rounded-xl text-white shadow-sm">
+                    <i class="fa-solid fa-shield-virus text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-slate-900 leading-tight">Task & Performance Evaluation Hub (Cloud Sync)</h1>
+                    <p class="text-xs text-slate-500">นายธวัชชัย ชุมพลสุข | นักวิทยาศาสตร์ ภาควิชาจุลชีววิทยา ศิริราชพยาบาล</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div id="cloudStatusBadge" class="hidden sm:flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-medium border border-emerald-200">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="cloudStatusText">เชื่อมต่อคลาวด์แล้ว</span>
+                </div>
+                <button onclick="openNotificationModal()" class="relative bg-slate-100 hover:bg-slate-200 p-2.5 rounded-xl transition text-slate-600 hover:text-slate-900" title="การแจ้งเตือน">
+                    <i class="fa-solid fa-bell"></i>
+                    <span id="notifBadge" class="absolute top-1 right-1 bg-rose-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">0</span>
+                </button>
+                <button onclick="exportData()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>ส่งออกรายงาน CSV</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 overflow-y-auto">
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-slate-800">
+            <div id="toastIcon" class="text-emerald-400 text-lg"><i class="fa-solid fa-circle-check"></i></div>
+            <div id="toastMessage" class="text-sm">บันทึกข้อมูลเรียบร้อยแล้ว</div>
+        </div>
+
+        <!-- Confirm Modal -->
+        <div id="confirmModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+                <div class="flex items-center space-x-3 text-amber-600">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                    <h3 id="confirmTitle" class="font-bold text-slate-900 text-base">ยืนยันการทำรายการ</h3>
+                </div>
+                <p id="confirmMessage" class="text-xs text-slate-600">คุณต้องการดำเนินการนี้ใช่หรือไม่?</p>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button onclick="closeConfirmModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-medium transition">ยกเลิก</button>
+                    <button id="confirmOkBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-medium transition">ยืนยัน</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Research Project Modal -->
+        <div id="researchModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-flask text-emerald-600"></i>
+                        <span>เพิ่มชื่องานวิจัย / โครงการใหม่</span>
+                    </h3>
+                    <button onclick="closeResearchModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 text-xs mb-1">ชื่อหัวข้อวิจัย / โครงการ *</label>
+                    <input type="text" id="newResearchNameInput" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500" placeholder="เช่น การตรวจวินิจฉัยวัณโรคด้วยวิธีใหม่ ระยะที่ 2">
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button onclick="closeResearchModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-medium transition">ยกเลิก</button>
+                    <button onclick="saveNewResearchProject()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-medium transition">บันทึกโครงการใหม่</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Task Modal -->
+        <div id="editModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-100 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-pen-to-square text-emerald-600"></i>
+                        <span>แก้ไขข้อมูลงาน / อัปเดตสถานะ (3 มิติ KPI)</span>
+                    </h3>
+                    <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <form id="editTaskForm" onsubmit="handleEditFormSubmit(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="editDocId">
+                    <input type="hidden" id="editTaskId">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">รายละเอียดงาน *</label>
+                        <input type="text" id="editTaskDesc" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่รับงาน *</label>
+                            <input type="date" id="editTaskDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันกำหนดเสร็จ</label>
+                            <input type="text" id="editTaskDueDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">หมวดภาระงานหลัก (6 ด้าน) *</label>
+                        <select id="editTaskCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900">
+                            <option value="1">1. พิจารณาคุณสมบัติและประเมินความพร้อมผู้ขอใช้ BSL-3 (15%)</option>
+                            <option value="2">2. ฝึกอบรมและประสานงานการฝึกอบรมบุคลากร BSL-3 (15%)</option>
+                            <option value="3">3. ควบคุมเอกสารคุณภาพ BSL-3 (15%)</option>
+                            <option value="4">4. กำกับดูแลการปฏิบัติงานและบำรุงรักษา BSL-3 (30%)</option>
+                            <option value="5">5. งานวิจัยของภาควิชาฯ และงานอื่นๆ (20%)</option>
+                            <option value="6">6. งานอื่นๆ ที่ได้รับมอบหมายจากภาควิชาฯ (5%)</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 space-y-3">
+                        <span class="font-bold text-emerald-900 block text-[11px]">การประเมิน KPI (แยกอิสระ 3 มิติ ระดับ 0 - 100%)</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                                <label class="block font-medium text-slate-700 mb-1">1. ปริมาณงาน (0-100%)</label>
+                                <input type="number" id="editQtyScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900 text-center font-bold">
+                            </div>
+                            <div>
+                                <label class="block font-medium text-slate-700 mb-1">2. คุณภาพงาน (0-100%)</label>
+                                <input type="number" id="editQualScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900 text-center font-bold">
+                            </div>
+                            <div>
+                                <label class="block font-medium text-slate-700 mb-1">3. ด้านเวลา (0-100%)</label>
+                                <input type="number" id="editTimeScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900 text-center font-bold">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">สถานะงาน</label>
+                        <select id="editTaskStatus" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900">
+                            <option value="in-progress">กำลังดำเนินการ (In-Progress)</option>
+                            <option value="completed">เสร็จสมบูรณ์ (Completed)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end space-x-2 pt-3">
+                        <button type="button" onclick="closeEditModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-medium">ยกเลิก</button>
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-medium shadow-sm">บันทึกการแก้ไข</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                <div class="bg-emerald-50 text-emerald-600 p-4 rounded-xl text-xl">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">งานทั้งหมดในระบบ</p>
+                    <h3 id="statTotalTasks" class="text-2xl font-bold text-slate-900">0</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                <div class="bg-blue-50 text-blue-600 p-4 rounded-xl text-xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">งานเสร็จสมบูรณ์</p>
+                    <h3 id="statCompletedTasks" class="text-2xl font-bold text-slate-900">0</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                <div class="bg-amber-50 text-amber-600 p-4 rounded-xl text-xl">
+                    <i class="fa-solid fa-spinner"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">กำลังดำเนินการ</p>
+                    <h3 id="statInProgressTasks" class="text-2xl font-bold text-slate-900">0</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                <div class="bg-violet-50 text-violet-600 p-4 rounded-xl text-xl">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">คะแนน KPI เฉลี่ยรวม</p>
+                    <h3 id="statTotalScore" class="text-2xl font-bold text-emerald-600">0.0%</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="space-y-6">
+                <!-- AI Smart Task Assistant Card -->
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-md relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 opacity-10 text-8xl">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="flex items-center space-x-2 mb-2">
+                        <div class="bg-emerald-500 text-white p-1.5 rounded-lg text-sm">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <h2 class="font-bold text-sm">ผู้ช่วย AI จัดหมวดภาระงานอัจฉริยะ</h2>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mb-3">พิมพ์งานที่เข้ามาเป็นประโยคอิสระ ระบบจะจัดหมวด 6 ด้านให้อัตโนมัติ พร้อมบันทึกขึ้นคลาวด์</p>
+                    
+                    <textarea id="aiInputPrompt" rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400 mb-3" placeholder="ระบุรายละเอียดงานที่เข้ามา..."></textarea>
+                    
+                    <button onclick="processAITask()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-medium text-xs shadow-sm transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>ให้ AI วิเคราะห์และบันทึกขึ้นคลาวด์ทันที</span>
+                    </button>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+                    <h3 class="font-bold text-slate-900 text-xs mb-3 flex items-center justify-between">
+                        <span>น้ำหนักภาระงานหลัก 6 ด้าน (KPI)</span>
+                        <span class="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">รวม 100%</span>
+                    </h3>
+                    <div class="space-y-2.5 text-[11px]">
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>1. พิจารณาคุณสมบัติผู้ขอใช้ BSL-3</span><span>15%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-emerald-600 h-full rounded-full" style="width: 15%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>2. ฝึกอบรมและประสานงานบุคลากร</span><span>15%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-emerald-600 h-full rounded-full" style="width: 15%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>3. ควบคุมเอกสารคุณภาพ SOP</span><span>15%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-emerald-600 h-full rounded-full" style="width: 15%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>4. กำกับดูแลแล็บและบำรุงรักษา</span><span>30%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-emerald-600 h-full rounded-full" style="width: 30%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>5. งานวิจัยของภาควิชาฯ และอื่นๆ</span><span>20%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-blue-600 h-full rounded-full" style="width: 20%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1 font-medium text-slate-700"><span>6. งานอื่นๆ ตามที่ได้รับมอบหมาย</span><span>5%</span></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-violet-600 h-full rounded-full" style="width: 5%"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Input Form -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                    <h2 class="font-bold text-slate-900 text-sm mb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-plus-circle text-emerald-600"></i>
+                        <span>แบบฟอร์มบันทึกงานเข้าสู่ระบบคลาวด์ (Task & Performance Evaluation Form)</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mb-4">บันทึกงานใหม่ ซิงค์เรียลไทม์ พร้อมประเมิน KPI แยก 3 มิติ (ปริมาณ, คุณภาพ, เวลา) แบบอิสระ 0-100%</p>
+                    
+                    <form id="taskForm" onsubmit="handleFormSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">รายละเอียดงาน / งานที่เข้ามา *</label>
+                            <input type="text" id="taskDesc" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-emerald-500 transition text-slate-900" placeholder="เช่น ตรวจสอบเอกสารขอเข้าใช้ห้องปฏิบัติการของ นศ.ปริญญาเอก">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">หมวดภาระงานหลัก (6 ด้าน) *</label>
+                            <select id="taskCategory" onchange="onCategoryChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-emerald-500 transition text-slate-900">
+                                <option value="1">1. พิจารณาคุณสมบัติและประเมินความพร้อมผู้ขอใช้ BSL-3 (15%)</option>
+                                <option value="2">2. ฝึกอบรมและประสานงานการฝึกอบรมบุคลากร BSL-3 (15%)</option>
+                                <option value="3">3. ควบคุมเอกสารคุณภาพ BSL-3 (15%)</option>
+                                <option value="4" selected>4. กำกับดูแลการปฏิบัติงานและบำรุงรักษา BSL-3 (30%)</option>
+                                <option value="5">5. งานวิจัยของภาควิชาฯ และงานอื่นๆ (20%)</option>
+                                <option value="6">6. งานอื่นๆ ที่ได้รับมอบหมายจากภาควิชาฯ (5%)</option>
+                            </select>
+                        </div>
+
+                        <!-- Research Project Selector -->
+                        <div id="researchProjectContainer" class="sm:col-span-2 hidden bg-blue-50/60 p-4 rounded-xl border border-blue-100">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block font-semibold text-blue-900">ชื่องานวิจัย / โครงการ (ระบุเพิ่มเติมสำหรับหมวด 5)</label>
+                                <button type="button" onclick="openResearchModal()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg transition font-medium flex items-center space-x-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                    <span>เพิ่มชื่องานวิจัยใหม่</span>
+                                </button>
+                            </div>
+                            <select id="taskResearchProject" class="w-full bg-white border border-blue-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-blue-500 text-slate-900">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่รับงาน (Receive Date) *</label>
+                            <input type="date" id="taskDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-emerald-500 transition text-slate-900">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันกำหนดเสร็จงาน (Due Date)</label>
+                            <input type="date" id="taskDueDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-emerald-500 transition text-slate-900 mb-1">
+                            <label class="flex items-center space-x-2 text-[11px] text-slate-500 cursor-pointer select-none">
+                                <input type="checkbox" id="noDueDate" onchange="toggleDueDateInput(this)" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>งานต่อเนื่อง / ไม่มีกำหนดเสร็จเฉพาะเจาะจง (Ongoing)</span>
+                            </label>
+                        </div>
+
+                        <div class="sm:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-900">เกณฑ์การประเมิน KPI 3 มิติอิสระ (ระดับคะแนน 0 - 100%)</span>
+                                <span class="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">ประเมินแยกอิสระ</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block font-medium text-slate-700 mb-1">1. ปริมาณ (0-100%) *</label>
+                                    <input type="number" id="taskQtyScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 text-center font-bold">
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-slate-700 mb-1">2. คุณภาพ (0-100%) *</label>
+                                    <input type="number" id="taskQualScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 text-center font-bold">
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-slate-700 mb-1">3. เวลา (0-100%) *</label>
+                                    <input type="number" id="taskTimeScore" min="0" max="100" value="100" required class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 text-center font-bold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">สถานะเริ่มต้นของงาน *</label>
+                            <select id="taskStatus" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-emerald-500 transition text-slate-900">
+                                <option value="in-progress" selected>กำลังดำเนินการ (In-Progress)</option>
+                                <option value="completed">เสร็จสมบูรณ์ (Completed)</option>
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-2 flex justify-end space-x-3 pt-2">
+                            <button type="reset" onclick="resetForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-medium transition">ล้างค่า</button>
+                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition flex items-center space-x-2">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>บันทึกงานขึ้นคลาวด์</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
+            <div class="flex items-center justify-between">
+                <h2 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-layer-group text-emerald-600"></i>
+                    <span>แยกส่วนการบริหารจัดการงาน (Cloud Sync)</span>
+                </h2>
+                <div class="flex space-x-2">
+                    <button onclick="loadSampleData()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition font-medium">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> โหลดข้อมูลตัวอย่าง
+                    </button>
+                    <button onclick="confirmClearAll()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg transition font-medium">
+                        <i class="fa-solid fa-trash mr-1"></i> ล้างข้อมูลคลาวด์ทั้งหมด
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 1: IN-PROGRESS TASKS -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-amber-200/80">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center space-x-2 text-amber-700">
+                        <i class="fa-solid fa-spinner animate-spin text-base"></i>
+                        <h3 class="font-bold text-sm">งานที่กำลังดำเนินการ (In-Progress Tasks)</h3>
+                        <span id="inProgressCountBadge" class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
+                    </div>
+                    <span class="text-xs text-slate-400">งานที่อยู่ระหว่างดำเนินการหรือรอส่งมอบ</span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-amber-50/50 text-slate-700 border-b border-slate-200">
+                                <th class="p-3 font-semibold">รหัส / วันที่รับงาน</th>
+                                <th class="p-3 font-semibold">รายละเอียดงาน / โครงการวิจัย</th>
+                                <th class="p-3 font-semibold text-center">กำหนดเสร็จ</th>
+                                <th class="p-3 font-semibold text-center">หมวดภาระงาน</th>
+                                <th class="p-3 font-semibold text-center">KPI 3 มิติ (ปริมาณ | คุณภาพ | เวลา)</th>
+                                <th class="p-3 font-semibold text-center">สถานะ</th>
+                                <th class="p-3 font-semibold text-right">จัดการด่วน</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inProgressTableBody" class="divide-y divide-slate-100">
+                            <!-- Rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION 2: COMPLETED TASKS -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-200/80">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center space-x-2 text-emerald-700">
+                        <i class="fa-solid fa-circle-check text-base"></i>
+                        <h3 class="font-bold text-sm">งานที่เสร็จแล้ว (Completed Tasks)</h3>
+                        <span id="completedCountBadge" class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
+                    </div>
+                    <span class="text-xs text-slate-400">งานที่ดำเนินการเสร็จสมบูรณ์เรียบร้อยแล้ว</span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-emerald-50/50 text-slate-700 border-b border-slate-200">
+                                <th class="p-3 font-semibold">รหัส / วันที่รับงาน</th>
+                                <th class="p-3 font-semibold">รายละเอียดงาน / โครงการวิจัย</th>
+                                <th class="p-3 font-semibold text-center">กำหนดเสร็จ</th>
+                                <th class="p-3 font-semibold text-center">หมวดภาระงาน</th>
+                                <th class="p-3 font-semibold text-center">KPI 3 มิติ (ปริมาณ | คุณภาพ | เวลา)</th>
+                                <th class="p-3 font-semibold text-center">สถานะ</th>
+                                <th class="p-3 font-semibold text-right">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completedTableBody" class="divide-y divide-slate-100">
+                            <!-- Rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+            <h2 class="font-bold text-slate-900 text-sm mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-calculator text-emerald-600"></i>
+                <span>สรุปผลการประเมินภาระงานรายด้าน (3 มิติ KPI แยกอิสระ) บนคลาวด์</span>
+            </h2>
+            <div id="categoryScoreBreakdown" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Notification Modal -->
+    <div id="notifModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-bell text-emerald-600"></i>
+                    <span>การแจ้งเตือนและสถานะคลาวด์</span>
+                </h3>
+                <button onclick="closeNotificationModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="notifContent" class="space-y-2.5 text-xs text-slate-600 max-h-60 overflow-y-auto">
+                <!-- Notif items -->
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeNotificationModal()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-medium">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bsl3-task-hub-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "DEMO_KEY",
+            authDomain: "demo.firebaseapp.com",
+            projectId: "demo-project"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        window.tasks = [];
+        window.researchProjects = [
+            "การตรวจวินิจฉัยวัณโรคดื้อยาด้วย Nanopore Targeted NGS",
+            "การศึกษาไมโครไบโอต้าในช่องปากและลำไส้",
+            "โครงการวิจัยความปลอดภัยทางชีวภาพและมาตรฐานห้องปฏิบัติการ"
+        ];
+
+        const categoryNames = {
+            1: "1. พิจารณาคุณสมบัติผู้ขอใช้ BSL-3",
+            2: "2. ฝึกอบรมและประสานงานบุคลากร",
+            3: "3. ควบคุมเอกสารคุณภาพ SOP",
+            4: "4. กำกับดูแลแล็บและบำรุงรักษา",
+            5: "5. งานวิจัยภาควิชาฯ และอื่นๆ",
+            6: "6. งานอื่นๆ ตามที่ได้รับมอบหมาย"
+        };
+
+        const categoryWeights = { 1: 15, 2: 15, 3: 15, 4: 30, 5: 20, 6: 5 };
+
+        document.getElementById('taskDate').valueAsDate = new Date();
+        document.getElementById('taskDueDate').valueAsDate = new Date();
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                document.getElementById('cloudStatusText').innerText = "ซิงค์คลาวด์ Real-time แล้ว";
+                setupFirestoreListeners();
+            } catch (e) {
+                console.error("Auth error:", e);
+                try {
+                    await signInAnonymously(auth);
+                    userId = auth.currentUser?.uid || crypto.randomUUID();
+                    document.getElementById('cloudStatusText').innerText = "ซิงค์คลาวด์ (Anonymous)";
+                    setupFirestoreListeners();
+                } catch (err) {
+                    console.error("Anonymous auth failed:", err);
+                    document.getElementById('cloudStatusText').innerText = "ทำงานในโหมดออฟไลน์";
+                }
+            }
+        }
+
+        function setupFirestoreListeners() {
+            if (!userId) return;
+            
+            // Tasks Collection Listener
+            const tasksRef = collection(db, 'artifacts', appId, 'users', userId, 'tasks');
+            onSnapshot(tasksRef, (snapshot) => {
+                window.tasks = [];
+                snapshot.forEach((docSnap) => {
+                    window.tasks.push({ docId: docSnap.id, ...docSnap.data() });
+                });
+                window.tasks.sort((a, b) => (a.date > b.date ? 1 : -1));
+                renderAll();
+            }, (error) => {
+                console.error("Tasks sync error:", error);
+                showToast("เกิดข้อผิดพลาดในการซิงค์ข้อมูลคลาวด์", true);
+            });
+
+            // Research Projects Listener
+            const projRef = collection(db, 'artifacts', appId, 'users', userId, 'research_projects');
+            onSnapshot(projRef, (snapshot) => {
+                if (!snapshot.empty) {
+                    window.researchProjects = [];
+                    snapshot.forEach((docSnap) => {
+                        if (docSnap.data().name) window.researchProjects.push(docSnap.data().name);
+                    });
+                    renderResearchProjectsDropdown();
+                } else {
+                    // Seed initial projects
+                    window.researchProjects.forEach(async (proj) => {
+                        try {
+                            await addDoc(projRef, { name: proj });
+                        } catch(e) {}
+                    });
+                }
+            }, (error) => {});
+        }
+
+        initAuth();
+
+        window.renderResearchProjectsDropdown = function() {
+            const select = document.getElementById('taskResearchProject');
+            if(select) {
+                select.innerHTML = window.researchProjects.map(p => `<option value="${p}">${p}</option>`).join('');
+            }
+        }
+
+        window.onCategoryChange = function() {
+            const cat = document.getElementById('taskCategory').value;
+            const resContainer = document.getElementById('researchProjectContainer');
+            if(cat === '5') {
+                resContainer.classList.remove('hidden');
+                window.renderResearchProjectsDropdown();
+            } else {
+                resContainer.classList.add('hidden');
+            }
+        }
+
+        window.openResearchModal = function() {
+            document.getElementById('newResearchNameInput').value = '';
+            document.getElementById('researchModal').classList.remove('hidden');
+        }
+
+        window.closeResearchModal = function() {
+            document.getElementById('researchModal').classList.add('hidden');
+        }
+
+        window.saveNewResearchProject = async function() {
+            const name = document.getElementById('newResearchNameInput').value.trim();
+            if(!name) {
+                showToast('กรุณาระบุชื่องานวิจัยหรือโครงการใหม่', true);
+                return;
+            }
+            if(!userId) return;
+            if(!window.researchProjects.includes(name)) {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'research_projects'), { name: name });
+                } catch(e) {}
+            }
+            document.getElementById('taskResearchProject').value = name;
+            closeResearchModal();
+            showToast('เพิ่มชื่องานวิจัยใหม่บนคลาวด์เรียบร้อยแล้ว');
+        }
+
+        window.toggleDueDateInput = function(checkbox) {
+            const dueDateInput = document.getElementById('taskDueDate');
+            if(checkbox.checked) {
+                dueDateInput.value = '';
+                dueDateInput.disabled = true;
+                dueDateInput.classList.add('bg-slate-100', 'text-slate-400');
+            } else {
+                dueDateInput.disabled = false;
+                dueDateInput.valueAsDate = new Date();
+                dueDateInput.classList.remove('bg-slate-100', 'text-slate-400');
+            }
+        }
+
+        window.resetForm = function() {
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskDate').valueAsDate = new Date();
+            document.getElementById('taskDueDate').valueAsDate = new Date();
+            document.getElementById('taskDueDate').disabled = false;
+            document.getElementById('taskDueDate').classList.remove('bg-slate-100', 'text-slate-400');
+            document.getElementById('researchProjectContainer').classList.add('hidden');
+        }
+
+        window.showToast = function(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = message;
+            toastIcon.innerHTML = isError ? '<i class="fa-solid fa-circle-exclamation text-rose-500"></i>' : '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        let confirmCallback = null;
+        window.openConfirmModal = function(title, msg, callback) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = msg;
+            confirmCallback = callback;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+        window.closeConfirmModal = function() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            confirmCallback = null;
+        }
+        document.getElementById('confirmOkBtn').onclick = function() {
+            if(confirmCallback) confirmCallback();
+            closeConfirmModal();
+        };
+
+        window.handleFormSubmit = async function(e) {
+            e.preventDefault();
+            if (!userId) {
+                showToast('กำลังเชื่อมต่อระบบคลาวด์ กรุณารอสักครู่...', true);
+                return;
+            }
+            const desc = document.getElementById('taskDesc').value;
+            const category = parseInt(document.getElementById('taskCategory').value);
+            const date = document.getElementById('taskDate').value;
+            const noDue = document.getElementById('noDueDate').checked;
+            const dueDate = noDue ? 'ไม่มีกำหนด' : document.getElementById('taskDueDate').value;
+            
+            const qtyScore = parseFloat(document.getElementById('taskQtyScore').value) || 0;
+            const qualScore = parseFloat(document.getElementById('taskQualScore').value) || 0;
+            const timeScore = parseFloat(document.getElementById('taskTimeScore').value) || 0;
+            const status = document.getElementById('taskStatus').value;
+            
+            let researchTag = '';
+            if(category === 5) {
+                researchTag = document.getElementById('taskResearchProject').value || '';
+            }
+
+            const newTask = {
+                id: 'T' + String(Date.now()).slice(-4),
+                date: date,
+                dueDate: dueDate,
+                desc: desc,
+                category: category,
+                researchTag: researchTag,
+                qtyScore: qtyScore,
+                qualScore: qualScore,
+                timeScore: timeScore,
+                status: status,
+                createdAt: Date.now()
+            };
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
+                resetForm();
+                showToast('บันทึกงานใหม่ขึ้นคลาวด์เรียบร้อยแล้ว!');
+            } catch (err) {
+                console.error("Add task error:", err);
+                showToast('ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', true);
+            }
+        }
+
+        window.openEditModal = function(docId) {
+            const t = window.tasks.find(item => item.docId === docId);
+            if(!t) return;
+            document.getElementById('editDocId').value = t.docId;
+            document.getElementById('editTaskId').value = t.id;
+            document.getElementById('editTaskDesc').value = t.desc;
+            document.getElementById('editTaskDate').value = t.date;
+            document.getElementById('editTaskDueDate').value = t.dueDate;
+            document.getElementById('editTaskCategory').value = t.category;
+            document.getElementById('editQtyScore').value = t.qtyScore !== undefined ? t.qtyScore : 100;
+            document.getElementById('editQualScore').value = t.qualScore !== undefined ? t.qualScore : 100;
+            document.getElementById('editTimeScore').value = t.timeScore !== undefined ? t.timeScore : 100;
+            document.getElementById('editTaskStatus').value = t.status || 'in-progress';
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        window.closeEditModal = function() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        window.handleEditFormSubmit = async function(e) {
+            e.preventDefault();
+            if (!userId) return;
+            const docId = document.getElementById('editDocId').value;
+            const t = window.tasks.find(item => item.docId === docId);
+            if(t) {
+                const updatedData = {
+                    desc: document.getElementById('editTaskDesc').value,
+                    date: document.getElementById('editTaskDate').value,
+                    dueDate: document.getElementById('editTaskDueDate').value,
+                    category: parseInt(document.getElementById('editTaskCategory').value),
+                    qtyScore: parseFloat(document.getElementById('editQtyScore').value) || 0,
+                    qualScore: parseFloat(document.getElementById('editQualScore').value) || 0,
+                    timeScore: parseFloat(document.getElementById('editTimeScore').value) || 0,
+                    status: document.getElementById('editTaskStatus').value
+                };
+                if(updatedData.category !== 5) updatedData.researchTag = '';
+
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
+                    await updateDoc(docRef, updatedData);
+                    closeEditModal();
+                    showToast('อัปเดตข้อมูลงานบนคลาวด์เรียบร้อยแล้ว!');
+                } catch (err) {
+                    console.error("Update error:", err);
+                    showToast('เกิดข้อผิดพลาดในการอัปเดต', true);
+                }
+            }
+        }
+
+        window.quickCompleteTask = async function(docId) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
+                await updateDoc(docRef, { status: 'completed' });
+                showToast('อัปเดตสถานะเป็น "เสร็จสมบูรณ์" เรียบร้อยแล้ว!');
+            } catch (err) {
+                console.error("Complete error:", err);
+                showToast('เกิดข้อผิดพลาด', true);
+            }
+        }
+
+        window.processAITask = async function() {
+            if (!userId) return;
+            const prompt = document.getElementById('aiInputPrompt').value.trim();
+            if(!prompt) {
+                showToast('กรุณาระบุรายละเอียดงานให้ AI วิเคราะห์ก่อนครับ', true);
+                return;
+            }
+
+            let cat = 4;
+            let resTag = '';
+            let lower = prompt.toLowerCase();
+
+            if(lower.includes('เอกสาร') || lower.includes('sop') || lower.includes('คู่มือ') || lower.includes('คุณภาพ')) {
+                cat = 3;
+            } else if(lower.includes('อบรม') || lower.includes('สอน') || lower.includes('บรรยาย') || lower.includes('บุคลากร')) {
+                cat = 2;
+            } else if(lower.includes('ประเมิน') || lower.includes('ขอเข้าใช้') || lower.includes('คุณสมบัติ') || lower.includes('ผู้ใช้')) {
+                cat = 1;
+            } else if(lower.includes('วิจัย') || lower.includes('nanopore') || lower.includes('วัณโรค') || lower.includes('ทดลอง') || lower.includes('ไมโครไบโอต้า')) {
+                cat = 5;
+                resTag = window.researchProjects[0];
+            } else if(lower.includes('ประชุม') || lower.includes('ธุรการ') || lower.includes('ทั่วไป') || lower.includes('อื่นๆ')) {
+                cat = 6;
+            } else if(lower.includes('ความดัน') || lower.includes('bsc') || lower.includes('ซ่อม') || lower.includes('บำรุง') || lower.includes('ตรวจเช็ค')) {
+                cat = 4;
+            }
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const newTask = {
+                id: 'AI' + String(Date.now()).slice(-4),
+                date: todayStr,
+                dueDate: 'ไม่มีกำหนด',
+                desc: prompt,
+                category: cat,
+                researchTag: resTag,
+                qtyScore: 100,
+                qualScore: 100,
+                timeScore: 100,
+                status: 'in-progress',
+                createdAt: Date.now()
+            };
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
+                document.getElementById('aiInputPrompt').value = '';
+                showToast(`AI วิเคราะห์จัดลงหมวด ${cat} และบันทึกขึ้นคลาวด์แล้ว!`);
+            } catch (err) {
+                showToast('เกิดข้อผิดพลาด', true);
+            }
+        }
+
+        window.deleteTask = async function(docId) {
+            if (!userId) return;
+            openConfirmModal('ยืนยันการลบ', 'คุณต้องการลบรายการงานนี้จากคลาวด์ใช่หรือไม่?', async () => {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
+                    await deleteDoc(docRef);
+                    showToast('ลบรายการงานเรียบร้อยแล้ว');
+                } catch (err) {
+                    showToast('เกิดข้อผิดพลาดในการลบ', true);
+                }
+            });
+        }
+
+        window.confirmClearAll = async function() {
+            if (!userId) return;
+            openConfirmModal('ยืนยันการล้างข้อมูลคลาวด์', 'คุณต้องการลบข้อมูลงานทั้งหมดในระบบคลาวด์ใช่หรือไม่?', async () => {
+                try {
+                    const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
+                    const deletePromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
+                    await Promise.all(deletePromises);
+                    showToast('ลบข้อมูลทั้งหมดบนคลาวด์แล้ว');
+                } catch (err) {
+                    showToast('เกิดข้อผิดพลาด', true);
+                }
+            });
+        }
+
+        window.loadSampleData = async function() {
+            if (!userId) return;
+            const samples = [
+                { id: 'T001', date: '2026-10-01', dueDate: '2026-10-05', desc: 'ตรวจสอบเอกสารขอเข้าใช้แล็บของ นศ.ปริญญาเอก', category: 1, researchTag: '', qtyScore: 100, qualScore: 95, timeScore: 100, status: 'completed', createdAt: 1 },
+                { id: 'T002', date: '2026-10-02', dueDate: 'ไม่มีกำหนด', desc: 'ตรวจเช็คความดันห้องและตู้ BSC ประจำสัปดาห์', category: 4, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 2 },
+                { id: 'T003', date: '2026-10-03', dueDate: '2026-10-15', desc: 'จัดทำและทบทวน SOP การกำจัดขยะติดเชื้อ BSL-3', category: 3, researchTag: '', qtyScore: 90, qualScore: 95, timeScore: 90, status: 'in-progress', createdAt: 3 },
+                { id: 'T004', date: '2026-10-04', dueDate: '2026-10-30', desc: 'ดำเนินการวิจัยการตรวจวัณโรคดื้อยาด้วย Nanopore', category: 5, researchTag: window.researchProjects[0], qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 4 },
+                { id: 'T005', date: '2026-10-05', dueDate: '2026-10-06', desc: 'อบรมความปลอดภัยชีวภาพเบื้องต้นแก่บุคลากรใหม่', category: 2, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'completed', createdAt: 5 }
+            ];
+
+            try {
+                for(let s of samples) {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), s);
+                }
+                showToast('โหลดข้อมูลตัวอย่างขึ้นคลาวด์เรียบร้อยแล้ว');
+            } catch (err) {
+                showToast('เกิดข้อผิดพลาด', true);
+            }
+        }
+
+        function renderAll() {
+            renderTables();
+            renderStats();
+            renderScoreBreakdown();
+            updateNotifications();
+        }
+
+        function renderTables() {
+            const inProgressTable = document.getElementById('inProgressTableBody');
+            const completedTable = document.getElementById('completedTableBody');
+
+            const inProgressTasks = window.tasks.filter(t => t.status !== 'completed');
+            const completedTasks = window.tasks.filter(t => t.status === 'completed');
+
+            document.getElementById('inProgressCountBadge').innerText = inProgressTasks.length;
+            document.getElementById('completedCountBadge').innerText = completedTasks.length;
+
+            if(inProgressTasks.length === 0) {
+                inProgressTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีงานที่กำลังดำเนินการบนคลาวด์อยู่ในขณะนี้</td></tr>`;
+            } else {
+                inProgressTable.innerHTML = inProgressTasks.slice().reverse().map(t => {
+                    const statusBadge = `<span class="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-medium">กำลังดำเนินการ</span>`;
+                    const dueDisplay = t.dueDate === 'ไม่มีกำหนด' ? `<span class="text-slate-400 italic">ไม่มีกำหนด</span>` : `<span class="text-slate-700 font-medium">${t.dueDate}</span>`;
+                    
+                    let descExtra = `<span class="font-medium text-slate-800">${t.desc}</span>`;
+                    if(t.category === 5 && t.researchTag) {
+                        descExtra += `<br><span class="inline-flex items-center space-x-1 text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded mt-1 font-medium"><i class="fa-solid fa-flask"></i><span>โครงการ: ${t.researchTag}</span></span>`;
+                    }
+
+                    const qty = t.qtyScore !== undefined ? t.qtyScore : 100;
+                    const qual = t.qualScore !== undefined ? t.qualScore : 100;
+                    const time = t.timeScore !== undefined ? t.timeScore : 100;
+
+                    return `
+                        <tr class="hover:bg-amber-50/20 transition border-b border-slate-100">
+                            <td class="p-3">
+                                <span class="font-bold text-slate-900">${t.id}</span><br>
+                                <span class="text-[10px] text-slate-400">${t.date}</span>
+                            </td>
+                            <td class="p-3 max-w-xs">${descExtra}</td>
+                            <td class="p-3 text-center">${dueDisplay}</td>
+                            <td class="p-3 text-center"><span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">หมวด ${t.category}</span></td>
+                            <td class="p-3 text-center font-semibold text-slate-700">
+                                <span class="text-emerald-700" title="ปริมาณ">${qty}%</span> | 
+                                <span class="text-blue-700" title="คุณภาพ">${qual}%</span> | 
+                                <span class="text-violet-700" title="เวลา">${time}%</span>
+                            </td>
+                            <td class="p-3 text-center">${statusBadge}</td>
+                            <td class="p-3 text-right space-x-1">
+                                <button onclick="quickCompleteTask('${t.docId}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg transition font-medium text-[11px]" title="เสร็จสิ้น"><i class="fa-solid fa-check mr-1"></i>เสร็จสิ้น</button>
+                                <button onclick="openEditModal('${t.docId}')" class="text-slate-400 hover:text-emerald-600 p-1.5 rounded-lg transition" title="แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="deleteTask('${t.docId}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            if(completedTasks.length === 0) {
+                completedTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ยังไม่มีงานที่เสร็จสมบูรณ์บนคลาวด์</td></tr>`;
+            } else {
+                completedTable.innerHTML = completedTasks.slice().reverse().map(t => {
+                    const statusBadge = `<span class="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-medium">เสร็จสมบูรณ์</span>`;
+                    const dueDisplay = t.dueDate === 'ไม่มีกำหนด' ? `<span class="text-slate-400 italic">ไม่มีกำหนด</span>` : `<span class="text-slate-700 font-medium">${t.dueDate}</span>`;
+                    
+                    let descExtra = `<span class="font-medium text-slate-800">${t.desc}</span>`;
+                    if(t.category === 5 && t.researchTag) {
+                        descExtra += `<br><span class="inline-flex items-center space-x-1 text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded mt-1 font-medium"><i class="fa-solid fa-flask"></i><span>โครงการ: ${t.researchTag}</span></span>`;
+                    }
+
+                    const qty = t.qtyScore !== undefined ? t.qtyScore : 100;
+                    const qual = t.qualScore !== undefined ? t.qualScore : 100;
+                    const time = t.timeScore !== undefined ? t.timeScore : 100;
+
+                    return `
+                        <tr class="hover:bg-emerald-50/20 transition border-b border-slate-100">
+                            <td class="p-3">
+                                <span class="font-bold text-slate-900">${t.id}</span><br>
+                                <span class="text-[10px] text-slate-400">${t.date}</span>
+                            </td>
+                            <td class="p-3 max-w-xs">${descExtra}</td>
+                            <td class="p-3 text-center">${dueDisplay}</td>
+                            <td class="p-3 text-center"><span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">หมวด ${t.category}</span></td>
+                            <td class="p-3 text-center font-semibold text-slate-700">
+                                <span class="text-emerald-700" title="ปริมาณ">${qty}%</span> | 
+                                <span class="text-blue-700" title="คุณภาพ">${qual}%</span> | 
+                                <span class="text-violet-700" title="เวลา">${time}%</span>
+                            </td>
+                            <td class="p-3 text-center">${statusBadge}</td>
+                            <td class="p-3 text-right space-x-1">
+                                <button onclick="openEditModal('${t.docId}')" class="text-slate-400 hover:text-emerald-600 p-1.5 rounded-lg transition" title="แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="deleteTask('${t.docId}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        function renderStats() {
+            const total = window.tasks.length;
+            const completed = window.tasks.filter(t => t.status === 'completed').length;
+            const inProgress = window.tasks.filter(t => t.status !== 'completed').length;
+
+            document.getElementById('statTotalTasks').innerText = total;
+            document.getElementById('statCompletedTasks').innerText = completed;
+            document.getElementById('statInProgressTasks').innerText = inProgress;
+
+            if(total === 0) {
+                document.getElementById('statTotalScore').innerText = '0.0%';
+                return;
+            }
+
+            let totalWeightedScore = 0;
+            let totalWeightUsed = 0;
+
+            for(let k = 1; k <= 6; k++) {
+                const catTasks = window.tasks.filter(t => t.category === k);
+                const weight = categoryWeights[k];
+                if(catTasks.length > 0) {
+                    let catQtyAvg = catTasks.reduce((acc, t) => acc + (t.qtyScore !== undefined ? t.qtyScore : 100), 0) / catTasks.length;
+                    let catQualAvg = catTasks.reduce((acc, t) => acc + (t.qualScore !== undefined ? t.qualScore : 100), 0) / catTasks.length;
+                    let catTimeAvg = catTasks.reduce((acc, t) => acc + (t.timeScore !== undefined ? t.timeScore : 100), 0) / catTasks.length;
+                    
+                    let catOverallAvg = (catQtyAvg + catQualAvg + catTimeAvg) / 3;
+                    totalWeightedScore += (catOverallAvg * weight) / 100;
+                    totalWeightUsed += weight;
+                }
+            }
+
+            const finalAvg = totalWeightUsed > 0 ? (totalWeightedScore / (totalWeightUsed / 100)) : 0;
+            document.getElementById('statTotalScore').innerText = finalAvg.toFixed(1) + '%';
+        }
+
+        function renderScoreBreakdown() {
+            const container = document.getElementById('categoryScoreBreakdown');
+            
+            container.innerHTML = [1,2,3,4,5,6].map(k => {
+                const catTasks = window.tasks.filter(t => t.category === k);
+                const weight = categoryWeights[k];
+                
+                let qtyAvg = 0, qualAvg = 0, timeAvg = 0;
+                if(catTasks.length > 0) {
+                    qtyAvg = catTasks.reduce((acc, t) => acc + (t.qtyScore !== undefined ? t.qtyScore : 100), 0) / catTasks.length;
+                    qualAvg = catTasks.reduce((acc, t) => acc + (t.qualScore !== undefined ? t.qualScore : 100), 0) / catTasks.length;
+                    timeAvg = catTasks.reduce((acc, t) => acc + (t.timeScore !== undefined ? t.timeScore : 100), 0) / catTasks.length;
+                }
+
+                const overallAvg = catTasks.length > 0 ? (qtyAvg + qualAvg + timeAvg) / 3 : 0;
+
+                return `
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-[10px] font-bold text-emerald-600 uppercase">หมวดที่ ${k} (น้ำหนัก ${weight}%)</span>
+                                <h4 class="font-bold text-slate-900 text-xs">${categoryNames[k].split('. ')[1]}</h4>
+                            </div>
+                            <span class="font-bold text-slate-900 text-sm">${overallAvg.toFixed(1)}%</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 grid grid-cols-3 gap-1 pt-1 border-t border-slate-200">
+                            <div>ปริมาณ: <b class="text-emerald-700">${qtyAvg.toFixed(0)}%</b></div>
+                            <div>คุณภาพ: <b class="text-blue-700">${qualAvg.toFixed(0)}%</b></div>
+                            <div>เวลา: <b class="text-violet-700">${timeAvg.toFixed(0)}%</b></div>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div class="bg-emerald-600 h-full rounded-full transition-all duration-500" style="width: ${overallAvg}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateNotifications() {
+            const badge = document.getElementById('notifBadge');
+            const notifContent = document.getElementById('notifContent');
+            
+            let alerts = [];
+            alerts.push(`<div class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-medium"><i class="fa-solid fa-cloud mr-1"></i> เชื่อมต่อ Google Cloud Firestore (Spark Plan) สำเร็จ ข้อมูลซิงค์ Real-time ข้ามอุปกรณ์เรียบร้อยครับ</div>`);
+            
+            if(window.tasks.length === 0) {
+                alerts.push(`<div class="p-3 bg-slate-50 rounded-xl">ยินดีต้อนรับครับ! เริ่มบันทึกงานแรกของคุณเพื่อติดตามภาระงาน BSL-3 บนคลาวด์ได้เลย</div>`);
+            } else {
+                const inProg = window.tasks.filter(t => t.status !== 'completed').length;
+                if(inProg > 0) {
+                    alerts.push(`<div class="p-3 bg-amber-50 text-amber-800 rounded-xl font-medium"><i class="fa-solid fa-spinner mr-1"></i> มีงานกำลังดำเนินการอยู่ ${inProg} รายการ</div>`);
+                }
+            }
+
+            badge.innerText = alerts.length;
+            notifContent.innerHTML = alerts.join('');
+        }
+
+        window.openNotificationModal = function() {
+            document.getElementById('notifModal').classList.remove('hidden');
+        }
+
+        window.closeNotificationModal = function() {
+            document.getElementById('notifModal').classList.add('hidden');
+        }
+
+        window.exportData = function() {
+            if(window.tasks.length === 0) {
+                showToast('ยังไม่มีข้อมูลสำหรับส่งออกครับ', true);
+                return;
+            }
+            let csv = '\uFEFFTask ID,Date,Due Date,Description,Category,Research Project,Quantity Score (%),Quality Score (%),Time Score (%),Status\n';
+            window.tasks.forEach(t => {
+                csv += `"${t.id}","${t.date}","${t.dueDate}","${t.desc.replace(/"/g, '""')}","${t.category}","${(t.researchTag||'').replace(/"/g, '""')}","${t.qtyScore}","${t.qualScore}","${t.timeScore}","${t.status}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BSL3_Cloud_Tasks_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            showToast('ส่งออกไฟล์รายงานสำเร็จเรียบร้อยแล้ว!');
+        }
+
+        window.renderResearchProjectsDropdown();
+    </script>
+</body>
+</html>
