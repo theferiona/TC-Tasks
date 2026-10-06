@@ -489,6 +489,7 @@
         const auth = getAuth(app);
 
         let userId = null;
+        let useFirestore = true;
         window.tasks = [];
         window.researchProjects = [
             "การตรวจวินิจฉัยวัณโรคดื้อยาด้วย Nanopore Targeted NGS",
@@ -521,23 +522,49 @@
                 document.getElementById('cloudStatusText').innerText = "ซิงค์คลาวด์ Real-time แล้ว";
                 setupFirestoreListeners();
             } catch (e) {
-                console.error("Auth error:", e);
-                try {
-                    await signInAnonymously(auth);
-                    userId = auth.currentUser?.uid || crypto.randomUUID();
-                    document.getElementById('cloudStatusText').innerText = "ซิงค์คลาวด์ (Anonymous)";
-                    setupFirestoreListeners();
-                } catch (err) {
-                    console.error("Anonymous auth failed:", err);
-                    document.getElementById('cloudStatusText').innerText = "ทำงานในโหมดออฟไลน์";
-                }
+                console.warn("Firebase Auth error, falling back to Local Storage mode:", e);
+                useFirestore = false;
+                userId = 'local-user';
+                document.getElementById('cloudStatusText').innerText = "โหมดออฟไลน์ (บันทึกในเครื่องอัตโนมัติ)";
+                loadLocalTasks();
             }
         }
 
+        function loadLocalTasks() {
+            try {
+                const localData = localStorage.getItem('bsl3_local_tasks');
+                window.tasks = localData ? JSON.parse(localData) : [];
+                window.tasks.sort((a, b) => (a.date > b.date ? 1 : -1));
+                renderAll();
+            } catch(err) {
+                window.tasks = [];
+                renderAll();
+            }
+
+            try {
+                const localProj = localStorage.getItem('bsl3_local_projects');
+                if(localProj) {
+                    window.researchProjects = JSON.parse(localProj);
+                }
+            } catch(e) {}
+            renderResearchProjectsDropdown();
+        }
+
+        function saveLocalTasks() {
+            try {
+                localStorage.setItem('bsl3_local_tasks', JSON.stringify(window.tasks));
+            } catch(e) {}
+        }
+
+        function saveLocalProjects() {
+            try {
+                localStorage.setItem('bsl3_local_projects', JSON.stringify(window.researchProjects));
+            } catch(e) {}
+        }
+
         function setupFirestoreListeners() {
-            if (!userId) return;
+            if (!userId || !useFirestore) return;
             
-            // Tasks Collection Listener
             const tasksRef = collection(db, 'artifacts', appId, 'users', userId, 'tasks');
             onSnapshot(tasksRef, (snapshot) => {
                 window.tasks = [];
@@ -547,11 +574,12 @@
                 window.tasks.sort((a, b) => (a.date > b.date ? 1 : -1));
                 renderAll();
             }, (error) => {
-                console.error("Tasks sync error:", error);
-                showToast("เกิดข้อผิดพลาดในการซิงค์ข้อมูลคลาวด์", true);
+                console.warn("Firestore listener error, switching to local mode:", error);
+                useFirestore = false;
+                document.getElementById('cloudStatusText').innerText = "โหมดออฟไลน์ (บันทึกในเครื่องอัตโนมัติ)";
+                loadLocalTasks();
             });
 
-            // Research Projects Listener
             const projRef = collection(db, 'artifacts', appId, 'users', userId, 'research_projects');
             onSnapshot(projRef, (snapshot) => {
                 if (!snapshot.empty) {
@@ -561,7 +589,6 @@
                     });
                     renderResearchProjectsDropdown();
                 } else {
-                    // Seed initial projects
                     window.researchProjects.forEach(async (proj) => {
                         try {
                             await addDoc(projRef, { name: proj });
@@ -606,15 +633,20 @@
                 showToast('กรุณาระบุชื่องานวิจัยหรือโครงการใหม่', true);
                 return;
             }
-            if(!userId) return;
             if(!window.researchProjects.includes(name)) {
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'research_projects'), { name: name });
-                } catch(e) {}
+                window.researchProjects.push(name);
+                if(useFirestore && userId) {
+                    try {
+                        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'research_projects'), { name: name });
+                    } catch(e) {}
+                } else {
+                    saveLocalProjects();
+                }
             }
             document.getElementById('taskResearchProject').value = name;
+            renderResearchProjectsDropdown();
             closeResearchModal();
-            showToast('เพิ่มชื่องานวิจัยใหม่บนคลาวด์เรียบร้อยแล้ว');
+            showToast('เพิ่มชื่องานวิจัยใหม่เรียบร้อยแล้ว');
         }
 
         window.toggleDueDateInput = function(checkbox) {
@@ -671,10 +703,6 @@
 
         window.handleFormSubmit = async function(e) {
             e.preventDefault();
-            if (!userId) {
-                showToast('กำลังเชื่อมต่อระบบคลาวด์ กรุณารอสักครู่...', true);
-                return;
-            }
             const desc = document.getElementById('taskDesc').value;
             const category = parseInt(document.getElementById('taskCategory').value);
             const date = document.getElementById('taskDate').value;
@@ -691,7 +719,9 @@
                 researchTag = document.getElementById('taskResearchProject').value || '';
             }
 
+            const docId = 'doc_' + Date.now();
             const newTask = {
+                docId: docId,
                 id: 'T' + String(Date.now()).slice(-4),
                 date: date,
                 dueDate: dueDate,
@@ -705,14 +735,24 @@
                 createdAt: Date.now()
             };
 
-            try {
-                await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
-                resetForm();
-                showToast('บันทึกงานใหม่ขึ้นคลาวด์เรียบร้อยแล้ว!');
-            } catch (err) {
-                console.error("Add task error:", err);
-                showToast('ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', true);
+            if (useFirestore && userId) {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
+                    resetForm();
+                    showToast('บันทึกงานใหม่ขึ้นคลาวด์เรียบร้อยแล้ว!');
+                    return;
+                } catch (err) {
+                    console.warn("Firestore write failed, falling back to local:", err);
+                    useFirestore = false;
+                }
             }
+
+            // Local storage fallback
+            window.tasks.push(newTask);
+            saveLocalTasks();
+            resetForm();
+            renderAll();
+            showToast('บันทึกงานใหม่ในเครื่องเรียบร้อยแล้ว!');
         }
 
         window.openEditModal = function(docId) {
@@ -737,48 +777,61 @@
 
         window.handleEditFormSubmit = async function(e) {
             e.preventDefault();
-            if (!userId) return;
             const docId = document.getElementById('editDocId').value;
-            const t = window.tasks.find(item => item.docId === docId);
-            if(t) {
-                const updatedData = {
-                    desc: document.getElementById('editTaskDesc').value,
-                    date: document.getElementById('editTaskDate').value,
-                    dueDate: document.getElementById('editTaskDueDate').value,
-                    category: parseInt(document.getElementById('editTaskCategory').value),
-                    qtyScore: parseFloat(document.getElementById('editQtyScore').value) || 0,
-                    qualScore: parseFloat(document.getElementById('editQualScore').value) || 0,
-                    timeScore: parseFloat(document.getElementById('editTimeScore').value) || 0,
-                    status: document.getElementById('editTaskStatus').value
-                };
-                if(updatedData.category !== 5) updatedData.researchTag = '';
+            const updatedData = {
+                desc: document.getElementById('editTaskDesc').value,
+                date: document.getElementById('editTaskDate').value,
+                dueDate: document.getElementById('editTaskDueDate').value,
+                category: parseInt(document.getElementById('editTaskCategory').value),
+                qtyScore: parseFloat(document.getElementById('editQtyScore').value) || 0,
+                qualScore: parseFloat(document.getElementById('editQualScore').value) || 0,
+                timeScore: parseFloat(document.getElementById('editTimeScore').value) || 0,
+                status: document.getElementById('editTaskStatus').value
+            };
+            if(updatedData.category !== 5) updatedData.researchTag = '';
 
+            if (useFirestore && userId && !docId.startsWith('doc_')) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
                     await updateDoc(docRef, updatedData);
                     closeEditModal();
                     showToast('อัปเดตข้อมูลงานบนคลาวด์เรียบร้อยแล้ว!');
+                    return;
                 } catch (err) {
-                    console.error("Update error:", err);
-                    showToast('เกิดข้อผิดพลาดในการอัปเดต', true);
+                    console.warn("Firestore update failed:", err);
                 }
+            }
+
+            const t = window.tasks.find(item => item.docId === docId);
+            if(t) {
+                Object.assign(t, updatedData);
+                saveLocalTasks();
+                renderAll();
+                closeEditModal();
+                showToast('อัปเดตข้อมูลงานในเครื่องเรียบร้อยแล้ว!');
             }
         }
 
         window.quickCompleteTask = async function(docId) {
-            if (!userId) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
-                await updateDoc(docRef, { status: 'completed' });
-                showToast('อัปเดตสถานะเป็น "เสร็จสมบูรณ์" เรียบร้อยแล้ว!');
-            } catch (err) {
-                console.error("Complete error:", err);
-                showToast('เกิดข้อผิดพลาด', true);
+            if (useFirestore && userId && !docId.startsWith('doc_')) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
+                    await updateDoc(docRef, { status: 'completed' });
+                    showToast('อัปเดตสถานะเป็น "เสร็จสมบูรณ์" เรียบร้อยแล้ว!');
+                    return;
+                } catch (err) {}
+            }
+
+            const t = window.tasks.find(item => item.docId === docId);
+            if(t) {
+                t.status = 'completed';
+                saveLocalTasks();
+                renderAll();
+                showToast('อัปเดตสถานะเรียบร้อยแล้ว!');
             }
         }
 
         window.processAITask = async function() {
-            if (!userId) return;
             const prompt = document.getElementById('aiInputPrompt').value.trim();
             if(!prompt) {
                 showToast('กรุณาระบุรายละเอียดงานให้ AI วิเคราะห์ก่อนครับ', true);
@@ -805,7 +858,9 @@
             }
 
             const todayStr = new Date().toISOString().split('T')[0];
+            const docId = 'doc_' + Date.now();
             const newTask = {
+                docId: docId,
                 id: 'AI' + String(Date.now()).slice(-4),
                 date: todayStr,
                 dueDate: 'ไม่มีกำหนด',
@@ -819,60 +874,81 @@
                 createdAt: Date.now()
             };
 
-            try {
-                await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
-                document.getElementById('aiInputPrompt').value = '';
-                showToast(`AI วิเคราะห์จัดลงหมวด ${cat} และบันทึกขึ้นคลาวด์แล้ว!`);
-            } catch (err) {
-                showToast('เกิดข้อผิดพลาด', true);
+            if (useFirestore && userId) {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), newTask);
+                    document.getElementById('aiInputPrompt').value = '';
+                    showToast(`AI วิเคราะห์จัดลงหมวด ${cat} และบันทึกขึ้นคลาวด์แล้ว!`);
+                    return;
+                } catch (err) {}
             }
+
+            window.tasks.push(newTask);
+            saveLocalTasks();
+            document.getElementById('aiInputPrompt').value = '';
+            renderAll();
+            showToast(`AI วิเคราะห์จัดลงหมวด ${cat} และบันทึกเรียบร้อยแล้ว!`);
         }
 
         window.deleteTask = async function(docId) {
-            if (!userId) return;
-            openConfirmModal('ยืนยันการลบ', 'คุณต้องการลบรายการงานนี้จากคลาวด์ใช่หรือไม่?', async () => {
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
-                    await deleteDoc(docRef);
-                    showToast('ลบรายการงานเรียบร้อยแล้ว');
-                } catch (err) {
-                    showToast('เกิดข้อผิดพลาดในการลบ', true);
+            openConfirmModal('ยืนยันการลบ', 'คุณต้องการลบรายการงานนี้ใช่หรือไม่?', async () => {
+                if (useFirestore && userId && !docId.startsWith('doc_')) {
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'users', userId, 'tasks', docId);
+                        await deleteDoc(docRef);
+                        showToast('ลบรายการงานเรียบร้อยแล้ว');
+                        return;
+                    } catch (err) {}
                 }
+
+                window.tasks = window.tasks.filter(t => t.docId !== docId);
+                saveLocalTasks();
+                renderAll();
+                showToast('ลบรายการงานเรียบร้อยแล้ว');
             });
         }
 
         window.confirmClearAll = async function() {
-            if (!userId) return;
-            openConfirmModal('ยืนยันการล้างข้อมูลคลาวด์', 'คุณต้องการลบข้อมูลงานทั้งหมดในระบบคลาวด์ใช่หรือไม่?', async () => {
-                try {
-                    const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
-                    const deletePromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
-                    await Promise.all(deletePromises);
-                    showToast('ลบข้อมูลทั้งหมดบนคลาวด์แล้ว');
-                } catch (err) {
-                    showToast('เกิดข้อผิดพลาด', true);
+            openConfirmModal('ยืนยันการล้างข้อมูล', 'คุณต้องการลบข้อมูลงานทั้งหมดในระบบใช่หรือไม่?', async () => {
+                if (useFirestore && userId) {
+                    try {
+                        const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
+                        const deletePromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
+                        await Promise.all(deletePromises);
+                    } catch (err) {}
                 }
+                window.tasks = [];
+                saveLocalTasks();
+                renderAll();
+                showToast('ลบข้อมูลทั้งหมดเรียบร้อยแล้ว');
             });
         }
 
         window.loadSampleData = async function() {
-            if (!userId) return;
             const samples = [
-                { id: 'T001', date: '2026-10-01', dueDate: '2026-10-05', desc: 'ตรวจสอบเอกสารขอเข้าใช้แล็บของ นศ.ปริญญาเอก', category: 1, researchTag: '', qtyScore: 100, qualScore: 95, timeScore: 100, status: 'completed', createdAt: 1 },
-                { id: 'T002', date: '2026-10-02', dueDate: 'ไม่มีกำหนด', desc: 'ตรวจเช็คความดันห้องและตู้ BSC ประจำสัปดาห์', category: 4, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 2 },
-                { id: 'T003', date: '2026-10-03', dueDate: '2026-10-15', desc: 'จัดทำและทบทวน SOP การกำจัดขยะติดเชื้อ BSL-3', category: 3, researchTag: '', qtyScore: 90, qualScore: 95, timeScore: 90, status: 'in-progress', createdAt: 3 },
-                { id: 'T004', date: '2026-10-04', dueDate: '2026-10-30', desc: 'ดำเนินการวิจัยการตรวจวัณโรคดื้อยาด้วย Nanopore', category: 5, researchTag: window.researchProjects[0], qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 4 },
-                { id: 'T005', date: '2026-10-05', dueDate: '2026-10-06', desc: 'อบรมความปลอดภัยชีวภาพเบื้องต้นแก่บุคลากรใหม่', category: 2, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'completed', createdAt: 5 }
+                { docId: 's1', id: 'T001', date: '2026-10-01', dueDate: '2026-10-05', desc: 'ตรวจสอบเอกสารขอเข้าใช้แล็บของ นศ.ปริญญาเอก', category: 1, researchTag: '', qtyScore: 100, qualScore: 95, timeScore: 100, status: 'completed', createdAt: 1 },
+                { docId: 's2', id: 'T002', date: '2026-10-02', dueDate: 'ไม่มีกำหนด', desc: 'ตรวจเช็คความดันห้องและตู้ BSC ประจำสัปดาห์', category: 4, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 2 },
+                { docId: 's3', id: 'T003', date: '2026-10-03', dueDate: '2026-10-15', desc: 'จัดทำและทบทวน SOP การกำจัดขยะติดเชื้อ BSL-3', category: 3, researchTag: '', qtyScore: 90, qualScore: 95, timeScore: 90, status: 'in-progress', createdAt: 3 },
+                { docId: 's4', id: 'T004', date: '2026-10-04', dueDate: '2026-10-30', desc: 'ดำเนินการวิจัยการตรวจวัณโรคดื้อยาด้วย Nanopore', category: 5, researchTag: window.researchProjects[0], qtyScore: 100, qualScore: 100, timeScore: 100, status: 'in-progress', createdAt: 4 },
+                { docId: 's5', id: 'T005', date: '2026-10-05', dueDate: '2026-10-06', desc: 'อบรมความปลอดภัยชีวภาพเบื้องต้นแก่บุคลากรใหม่', category: 2, researchTag: '', qtyScore: 100, qualScore: 100, timeScore: 100, status: 'completed', createdAt: 5 }
             ];
 
-            try {
-                for(let s of samples) {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), s);
-                }
-                showToast('โหลดข้อมูลตัวอย่างขึ้นคลาวด์เรียบร้อยแล้ว');
-            } catch (err) {
-                showToast('เกิดข้อผิดพลาด', true);
+            if (useFirestore && userId) {
+                try {
+                    for(let s of samples) {
+                        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), {
+                            id: s.id, date: s.date, dueDate: s.dueDate, desc: s.desc, category: s.category, researchTag: s.researchTag, qtyScore: s.qtyScore, qualScore: s.qualScore, timeScore: s.timeScore, status: s.status, createdAt: s.createdAt
+                        });
+                    }
+                    showToast('โหลดข้อมูลตัวอย่างขึ้นคลาวด์เรียบร้อยแล้ว');
+                    return;
+                } catch (err) {}
             }
+
+            window.tasks = samples;
+            saveLocalTasks();
+            renderAll();
+            showToast('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว');
         }
 
         function renderAll() {
@@ -893,7 +969,7 @@
             document.getElementById('completedCountBadge').innerText = completedTasks.length;
 
             if(inProgressTasks.length === 0) {
-                inProgressTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีงานที่กำลังดำเนินการบนคลาวด์อยู่ในขณะนี้</td></tr>`;
+                inProgressTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ไม่มีงานที่กำลังดำเนินการอยู่ในขณะนี้</td></tr>`;
             } else {
                 inProgressTable.innerHTML = inProgressTasks.slice().reverse().map(t => {
                     const statusBadge = `<span class="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-medium">กำลังดำเนินการ</span>`;
@@ -934,7 +1010,7 @@
             }
 
             if(completedTasks.length === 0) {
-                completedTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ยังไม่มีงานที่เสร็จสมบูรณ์บนคลาวด์</td></tr>`;
+                completedTable.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">ยังไม่มีงานที่เสร็จสมบูรณ์</td></tr>`;
             } else {
                 completedTable.innerHTML = completedTasks.slice().reverse().map(t => {
                     const statusBadge = `<span class="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-medium">เสร็จสมบูรณ์</span>`;
@@ -1052,10 +1128,14 @@
             const notifContent = document.getElementById('notifContent');
             
             let alerts = [];
-            alerts.push(`<div class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-medium"><i class="fa-solid fa-cloud mr-1"></i> เชื่อมต่อ Google Cloud Firestore (Spark Plan) สำเร็จ ข้อมูลซิงค์ Real-time ข้ามอุปกรณ์เรียบร้อยครับ</div>`);
+            if(useFirestore) {
+                alerts.push(`<div class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-medium"><i class="fa-solid fa-cloud mr-1"></i> เชื่อมต่อ Google Cloud Firestore สำเร็จ ซิงค์ Real-time ข้ามอุปกรณ์เรียบร้อยครับ</div>`);
+            } else {
+                alerts.push(`<div class="p-3 bg-blue-50 text-blue-800 rounded-xl font-medium"><i class="fa-solid fa-hard-drive mr-1"></i> โหมดบันทึกอัตโนมัติในเครื่อง (Local Storage Mode) ใช้งานได้ปกติ ข้อมูลไม่สูญหาย</div>`);
+            }
             
             if(window.tasks.length === 0) {
-                alerts.push(`<div class="p-3 bg-slate-50 rounded-xl">ยินดีต้อนรับครับ! เริ่มบันทึกงานแรกของคุณเพื่อติดตามภาระงาน BSL-3 บนคลาวด์ได้เลย</div>`);
+                alerts.push(`<div class="p-3 bg-slate-50 rounded-xl">ยินดีต้อนรับครับ! เริ่มบันทึกงานแรกของคุณเพื่อติดตามภาระงาน BSL-3 ได้เลย</div>`);
             } else {
                 const inProg = window.tasks.filter(t => t.status !== 'completed').length;
                 if(inProg > 0) {
@@ -1088,7 +1168,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `BSL3_Cloud_Tasks_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `BSL3_Tasks_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             showToast('ส่งออกไฟล์รายงานสำเร็จเรียบร้อยแล้ว!');
         }
